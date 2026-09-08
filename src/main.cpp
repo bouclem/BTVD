@@ -71,7 +71,9 @@ void mine_mode(int argc, char* argv[]) {
     }
 
     Blockchain chain;
-    chain.init();
+    if (!chain.load_from_disk("bitvoid.chain")) {
+        chain.init();
+    }
     Mempool mempool;
     ConsensusEngine consensus;
     ConsensusParams params;
@@ -117,6 +119,7 @@ void mine_mode(int argc, char* argv[]) {
             if (chain.add_block(*block)) {
                 blocks_mined++;
                 std::cout << "Block added to chain! Total mined: " << blocks_mined << std::endl;
+                chain.save_to_disk("bitvoid.chain");
 
                 // Remove confirmed transactions from mempool.
                 for (const auto& tx : block->transactions) {

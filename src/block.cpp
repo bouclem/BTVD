@@ -14,9 +14,6 @@ std::string Block::serialize() const {
        << header.nonce
        << header.merkle_root
        << header.difficulty
-       << header.energy_kwh
-       << header.watt_seconds
-       << header.energy_source
        << header.miner_address;
 
     for (const auto& tx : transactions) {
