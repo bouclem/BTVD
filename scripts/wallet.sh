@@ -1,0 +1,16 @@
+#!/bin/bash
+echo "================================"
+echo "  BitVoid Wallet"
+echo "================================"
+echo
+
+if ! command -v bitvoid-core &> /dev/null; then
+    if [ -f ./bitvoid-core ]; then
+        ./bitvoid-core wallet "$@"
+    else
+        echo "Please download bitvoid-core and put it in this folder."
+        exit 1
+    fi
+else
+    bitvoid-core wallet "$@"
+fi
