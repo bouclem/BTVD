@@ -225,7 +225,7 @@ With 0.5 BTVD per block and low initial difficulty, early miners can accumulate 
 ### Phase 1: Design & Documentation
 - Core concept and consensus design
 - Whitepaper publication
-- Community setup (Discord, GitHub, Twitter/X)
+- Community setup (GitHub, r/BitVoid)
 - Technical specification
 
 ### Phase 2: Development

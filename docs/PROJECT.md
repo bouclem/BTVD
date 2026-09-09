@@ -241,7 +241,9 @@ explorer.bat / explorer.sh → Runs a local block explorer (web UI)
 ## 8. Website & Hosting
 
 ### Hosting
-- **Platform:** GitHub Pages (free, Git-based, automatic SSL)
+- **Platform:** Vercel (free, Git-based, automatic SSL, auto-deploy on push)
+- **Source:** `/web` folder in the GitHub repo
+- **Config:** `vercel.json` in project root
 - **Domain:** To be purchased (~$10-15/year)
 - **Site type:** Static landing page
 
@@ -252,7 +254,7 @@ Landing page:
 ├── Whitepaper link
 ├── How to mine (guide)
 ├── Roadmap
-├── Discord link
+├── Reddit link (r/BitVoid)
 ├── GitHub link
 └── Block explorer link (when live)
 ```
@@ -262,14 +264,12 @@ Landing page:
 ## 9. Community Strategy
 
 ### Step 1: Create Presence (Week 1)
-- Discord server (free)
 - GitHub repo with whitepaper (free)
-- Twitter/X account (free)
 - Reddit account (free)
-- r/BitVoid subreddit (create early, even with 0 subscribers)
+- r/BitVoid subreddit (https://www.reddit.com/r/BitVoid/)
 
 ### Step 2: Seed with Friends (Week 1)
-- Invite 3-5 friends to Discord
+- Invite 3-5 friends to r/BitVoid
 - Ask them to invite 1-2 people each
 - Share whitepaper, get feedback, make them feel involved
 - Target: 10-20 people to start
@@ -277,8 +277,7 @@ Landing page:
 ### Step 3: Post in Crypto Communities (Week 1-2)
 - BitcoinTalk forum: "Alternate Cryptocurrencies" / "Announcements" section
 - Reddit: DM moderators of r/CryptoCurrency, r/altcoin, r/CryptoTechnology, r/CryptoCurrencyMining asking permission to post technical content
-- Twitter/X: post development progress with #crypto #blockchain hashtags
-- Discord crypto servers: join mining communities, be helpful, mention project naturally
+- Post development progress on r/BitVoid with technical depth
 
 ### Reddit Rules (Critical)
 - Always disclose affiliation: "I'm the creator of BitVoid"
@@ -293,7 +292,7 @@ Landing page:
 | Size | Timeline | How |
 |---|---|---|
 | 0 → 10 | Week 1 | Friends + direct invites |
-| 10 → 50 | Month 1 | Reddit, BitcoinTalk, Twitter |
+| 10 → 50 | Month 1 | Reddit, BitcoinTalk |
 | 50 → 200 | Month 2-3 | Word of mouth, development progress |
 | 200 → 1000 | Month 3-6 | Exchange listings, mining going live |
 | 1000+ | Month 6+ | Narrative carries itself |
@@ -315,7 +314,7 @@ Regular development progress attracts people. "Just implemented the block struct
 - [x] Technical stack decision (C++ from scratch)
 - [x] Website hosting decision (GitHub Pages)
 - [x] Community strategy
-- [ ] Community setup (Discord, GitHub, Twitter/X, r/BitVoid)
+- [ ] Community setup (GitHub, r/BitVoid)
 - [ ] Technical specification document
 
 ### Phase 2: Development
