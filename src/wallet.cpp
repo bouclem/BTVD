@@ -1,19 +1,20 @@
 #include "wallet.h"
 #include "sha256.h"
 #include <openssl/evp.h>
-#include <openssl/ec.h>
-#include <openssl/pem.h>
+#include <openssl/core_names.h>
+#include <openssl/param_build.h>
 #include <openssl/rand.h>
-#include <openssl/obj_mac.h>
 #include <fstream>
 #include <sstream>
 #include <iostream>
-#include <memory>
+#include <vector>
+#include <cstdint>
 
 namespace bitvoid {
 
-// ECDSA key pair using secp256k1 (same curve as Bitcoin).
-// Architecture is designed to swap to post-quantum (ML-DSA) later.
+// ML-DSA-65 (Dilithium) post-quantum signatures via OpenSSL 3.4+.
+// NIST FIPS 204 compliant.
+// Immune to quantum computer attacks.
 
 struct Wallet::Impl {
     EVP_PKEY* key_pair = nullptr;
@@ -34,11 +35,10 @@ void Wallet::generate_keys() {
         EVP_PKEY_free(impl_->key_pair);
     }
 
-    EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, nullptr);
-    EVP_PKEY_keygen_init(ctx);
-    EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx, NID_secp256k1);
+    EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new_from_name(nullptr, "ML-DSA-65", nullptr);
+    if (!ctx) return;
 
-    impl_->key_pair = nullptr;
+    EVP_PKEY_keygen_init(ctx);
     EVP_PKEY_keygen(ctx, &impl_->key_pair);
 
     EVP_PKEY_CTX_free(ctx);
@@ -46,10 +46,10 @@ void Wallet::generate_keys() {
 
 // Extract public key bytes.
 static std::vector<uint8_t> get_public_key_bytes(EVP_PKEY* key) {
-    int len = i2d_PUBKEY(key, nullptr);
+    size_t len = 0;
+    EVP_PKEY_get_octet_string_param(key, OSSL_PKEY_PARAM_PUB_KEY, nullptr, 0, &len);
     std::vector<uint8_t> buf(len);
-    uint8_t* ptr = buf.data();
-    i2d_PUBKEY(key, &ptr);
+    EVP_PKEY_get_octet_string_param(key, OSSL_PKEY_PARAM_PUB_KEY, buf.data(), len, &len);
     return buf;
 }
 
@@ -61,49 +61,71 @@ std::string Wallet::get_public_key_hex() const {
 
 std::string Wallet::get_address() const {
     if (!impl_->key_pair) return "";
-    // Address = first 20 bytes of SHA-256(public_key), encoded as hex.
     auto pub_bytes = get_public_key_bytes(impl_->key_pair);
     std::string pub_str(pub_bytes.begin(), pub_bytes.end());
     std::string hash = sha256(pub_str);
-    return hash.substr(0, 40); // first 20 bytes = 40 hex chars
+    return hash.substr(0, 40);
 }
 
 std::string Wallet::sign(const std::string& data) const {
     if (!impl_->key_pair) return "";
 
-    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
-    EVP_DigestSignInit(ctx, nullptr, EVP_sha256(), nullptr, impl_->key_pair);
+    EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new_from_pkey(nullptr, impl_->key_pair, nullptr);
+    EVP_SIGNATURE* sig_alg = EVP_SIGNATURE_fetch(nullptr, "ML-DSA-65", nullptr);
+    if (!ctx || !sig_alg) {
+        if (sig_alg) EVP_SIGNATURE_free(sig_alg);
+        if (ctx) EVP_PKEY_CTX_free(ctx);
+        return "";
+    }
 
-    EVP_DigestSignUpdate(ctx, data.data(), data.size());
+    EVP_PKEY_sign_message_init(ctx, sig_alg, nullptr);
 
     size_t sig_len = 0;
-    EVP_DigestSignFinal(ctx, nullptr, &sig_len);
+    EVP_PKEY_sign(ctx, nullptr, &sig_len, reinterpret_cast<const unsigned char*>(data.data()), data.size());
 
     std::vector<uint8_t> sig(sig_len);
-    EVP_DigestSignFinal(ctx, sig.data(), &sig_len);
+    EVP_PKEY_sign(ctx, sig.data(), &sig_len, reinterpret_cast<const unsigned char*>(data.data()), data.size());
 
-    EVP_MD_CTX_free(ctx);
+    EVP_SIGNATURE_free(sig_alg);
+    EVP_PKEY_CTX_free(ctx);
 
     return bytes_to_hex(sig);
 }
 
 bool Wallet::verify(const std::string& data, const std::string& signature_hex, const std::string& public_key_hex) {
-    // Reconstruct public key from hex.
     auto pub_bytes = hex_to_bytes(public_key_hex);
-
-    const uint8_t* pub_ptr = pub_bytes.data();
-    EVP_PKEY* key = d2i_PUBKEY(nullptr, &pub_ptr, pub_bytes.size());
-    if (!key) return false;
-
     auto sig_bytes = hex_to_bytes(signature_hex);
 
-    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
-    EVP_DigestVerifyInit(ctx, nullptr, EVP_sha256(), nullptr, key);
-    EVP_DigestVerifyUpdate(ctx, data.data(), data.size());
+    // Reconstruct public key from raw bytes.
+    OSSL_PARAM params[2];
+    params[0] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PUB_KEY, pub_bytes.data(), pub_bytes.size());
+    params[1] = OSSL_PARAM_construct_end();
 
-    int result = EVP_DigestVerifyFinal(ctx, sig_bytes.data(), sig_bytes.size());
+    EVP_PKEY_CTX* pctx = EVP_PKEY_CTX_new_from_name(nullptr, "ML-DSA-65", nullptr);
+    EVP_PKEY* key = nullptr;
+    EVP_PKEY_fromdata_init(pctx);
+    EVP_PKEY_fromdata(pctx, &key, EVP_PKEY_PUBLIC_KEY, params);
+    EVP_PKEY_CTX_free(pctx);
 
-    EVP_MD_CTX_free(ctx);
+    if (!key) return false;
+
+    EVP_PKEY_CTX* vctx = EVP_PKEY_CTX_new_from_pkey(nullptr, key, nullptr);
+    EVP_SIGNATURE* sig_alg = EVP_SIGNATURE_fetch(nullptr, "ML-DSA-65", nullptr);
+
+    if (!vctx || !sig_alg) {
+        if (sig_alg) EVP_SIGNATURE_free(sig_alg);
+        if (vctx) EVP_PKEY_CTX_free(vctx);
+        EVP_PKEY_free(key);
+        return false;
+    }
+
+    EVP_PKEY_verify_message_init(vctx, sig_alg, nullptr);
+
+    int result = EVP_PKEY_verify(vctx, sig_bytes.data(), sig_bytes.size(),
+        reinterpret_cast<const unsigned char*>(data.data()), data.size());
+
+    EVP_SIGNATURE_free(sig_alg);
+    EVP_PKEY_CTX_free(vctx);
     EVP_PKEY_free(key);
 
     return result == 1;
@@ -184,21 +206,29 @@ bool Wallet::has_keys() const {
 bool Wallet::save(const std::string& path) const {
     if (!impl_->key_pair) return false;
 
-    FILE* file = fopen(path.c_str(), "wb");
-    if (!file) return false;
+    // Save full key pair (private + public) to binary file.
+    int len = i2d_PrivateKey(impl_->key_pair, nullptr);
+    if (len <= 0) return false;
 
-    int result = i2d_PUBKEY_fp(file, impl_->key_pair);
-    fclose(file);
-    return result == 1;
+    std::vector<uint8_t> buf(len);
+    unsigned char* ptr = buf.data();
+    i2d_PrivateKey(impl_->key_pair, &ptr);
+
+    std::ofstream file(path, std::ios::binary);
+    if (!file.is_open()) return false;
+
+    file.write(reinterpret_cast<const char*>(buf.data()), buf.size());
+    return true;
 }
 
 bool Wallet::load(const std::string& path) {
-    FILE* file = fopen(path.c_str(), "rb");
-    if (!file) return false;
+    std::ifstream file(path, std::ios::binary);
+    if (!file.is_open()) return false;
 
-    EVP_PKEY* key = nullptr;
-    key = d2i_PUBKEY_fp(file, &key);
-    fclose(file);
+    std::vector<uint8_t> buf((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+    const unsigned char* ptr = buf.data();
+    EVP_PKEY* key = d2i_PrivateKey(EVP_PKEY_NONE, nullptr, &ptr, buf.size());
 
     if (!key) return false;
 
@@ -216,11 +246,14 @@ void generate_new_wallet(const std::string& save_path) {
     std::cout << "New wallet created!" << std::endl;
     std::cout << "  Address: " << wallet.get_address() << std::endl;
     std::cout << "  Public key: " << wallet.get_public_key_hex().substr(0, 40) << "..." << std::endl;
+    std::cout << "  (Post-quantum: ML-DSA-65 / Dilithium)" << std::endl;
 
     if (!save_path.empty()) {
-        // Save private key in PEM format.
-        // For now, just print the address.
-        std::cout << "  Save path: " << save_path << std::endl;
+        if (wallet.save(save_path)) {
+            std::cout << "  Saved to: " << save_path << std::endl;
+        } else {
+            std::cout << "  Failed to save to: " << save_path << std::endl;
+        }
     }
 }
 

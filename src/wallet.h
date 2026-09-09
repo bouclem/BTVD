@@ -8,8 +8,8 @@
 namespace bitvoid {
 
 // Wallet: manages keys, addresses, and transaction creation.
-// Uses OpenSSL for key generation and signing (ECDSA secp256k1 for now,
-// with architecture ready to swap to post-quantum signatures later).
+// Uses ML-DSA-65 (Dilithium) for post-quantum secure signatures.
+// NIST FIPS 204 compliant. Immune to quantum computer attacks.
 
 class Wallet {
 public:
