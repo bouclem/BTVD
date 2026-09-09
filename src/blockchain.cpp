@@ -1,5 +1,6 @@
 #include "blockchain.h"
 #include "sha256.h"
+#include "wallet.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <sstream>
@@ -67,12 +68,22 @@ bool Blockchain::add_block(const Block& block) {
     }
 
     // Validate all transactions.
-    for (const auto& tx : block.transactions) {
+    for (size_t i = 0; i < block.transactions.size(); i++) {
+        const auto& tx = block.transactions[i];
+
         if (!tx.is_valid_structure()) {
             return false;
         }
         // Verify tx hash.
         if (tx.calculate_hash() != tx.hash) {
+            return false;
+        }
+        // Skip signature verification for coinbase (first tx in block).
+        if (i == 0 && tx.is_coinbase()) {
+            continue;
+        }
+        // Verify signatures and ownership.
+        if (!verify_transaction_signatures(tx)) {
             return false;
         }
     }
@@ -153,6 +164,7 @@ bool Blockchain::validate_block(const Block& block) const {
 bool Blockchain::validate_transaction(const Transaction& tx) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
+    if (tx.is_coinbase()) return false; // coinbase txs are not accepted via mempool
     if (!tx.is_valid_structure()) return false;
     if (tx.calculate_hash() != tx.hash) return false;
 
@@ -161,6 +173,9 @@ bool Blockchain::validate_transaction(const Transaction& tx) const {
         std::string key = utxo_key(in.tx_id, in.output_index);
         if (!utxo_set_.count(key)) return false;
     }
+
+    // Verify signatures and ownership.
+    if (!verify_transaction_signatures(tx)) return false;
 
     return true;
 }
@@ -250,6 +265,26 @@ std::vector<Block> Blockchain::get_blocks(uint64_t from_index) const {
         result.push_back(chain_[i]);
     }
     return result;
+}
+
+bool Blockchain::verify_transaction_signatures(const Transaction& tx) const {
+    std::string data_to_verify = tx.serialize();
+
+    for (const auto& in : tx.inputs) {
+        // Derive address from public key and check it owns the UTXO.
+        std::string derived_address = Wallet::address_from_public_key(in.public_key);
+
+        auto it = utxo_set_.find(utxo_key(in.tx_id, in.output_index));
+        if (it == utxo_set_.end()) return false;
+        if (it->second.address != derived_address) return false;
+
+        // Verify the signature.
+        if (!Wallet::verify(data_to_verify, in.signature, in.public_key)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 } // namespace bitvoid

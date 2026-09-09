@@ -33,9 +33,10 @@ void print_help() {
     std::cout << "  --energy Y     Declared energy source (solar, hydro, wind, etc.)" << std::endl;
     std::cout << "  --port P       P2P port (default: 8333)" << std::endl;
     std::cout << "  --connect H:P  Connect to peer at host:port" << std::endl;
-    std::cout << "  --new          Create new wallet" << std::endl;
+    std::cout << "  --new          Create new wallet (saved to wallet.key or --wallet-file)" << std::endl;
     std::cout << "  --balance      Show wallet balance" << std::endl;
-    std::cout << "  --send A:ADDR  Send A BTVD to ADDR" << std::endl;
+    std::cout << "  --send A:ADDR  Send A BTVD to ADDR (requires --wallet-file)" << std::endl;
+    std::cout << "  --wallet-file F  Path to wallet key file (default: wallet.key)" << std::endl;
     std::cout << "  --help         Show this help" << std::endl;
 }
 
@@ -104,12 +105,14 @@ void mine_mode(int argc, char* argv[]) {
 
         // Update difficulty based on recent blocks.
         std::vector<uint64_t> timestamps;
-        for (uint64_t i = 0; i < chain.height() && i < 1000; i++) {
-            auto block = chain.get_block(chain.height() - 1000 + i);
+        uint64_t chain_h = chain.height();
+        uint64_t lookback = (std::min)(chain_h, static_cast<uint64_t>(1000));
+        for (uint64_t i = 0; i < lookback; i++) {
+            auto block = chain.get_block(chain_h - lookback + i);
             if (block) timestamps.push_back(block->header.timestamp);
         }
         if (timestamps.size() >= 2) {
-            params.difficulty = consensus.calculate_difficulty(timestamps);
+            params.difficulty = consensus.calculate_difficulty(timestamps, latest.header.difficulty);
         }
 
         // Mine the block.
@@ -177,11 +180,18 @@ void node_mode(int argc, char* argv[]) {
 
 void wallet_mode(int argc, char* argv[]) {
     if (has_arg(argc, argv, "--new")) {
+        std::string wallet_file = get_arg(argc, argv, "--wallet-file", "wallet.key");
         Wallet wallet;
         wallet.generate_keys();
         std::cout << "New wallet created!" << std::endl;
         std::cout << "  Address: " << wallet.get_address() << std::endl;
         std::cout << "  Public key: " << wallet.get_public_key_hex().substr(0, 40) << "..." << std::endl;
+        if (wallet.save(wallet_file)) {
+            std::cout << "  Saved to: " << wallet_file << std::endl;
+            std::cout << "  Keep this file safe! You need it to spend your BTVD." << std::endl;
+        } else {
+            std::cerr << "  Failed to save wallet to " << wallet_file << std::endl;
+        }
         return;
     }
 
@@ -215,8 +225,13 @@ void wallet_mode(int argc, char* argv[]) {
         std::string to_address = send_str.substr(colon + 1);
         uint64_t amount = static_cast<uint64_t>(amount_btvd * 100000000);
 
+        std::string wallet_file = get_arg(argc, argv, "--wallet-file", "wallet.key");
         Wallet wallet;
-        wallet.generate_keys();
+        if (!wallet.load(wallet_file)) {
+            std::cerr << "Failed to load wallet from " << wallet_file << std::endl;
+            std::cerr << "Create one first with: bitvoid-core wallet --new" << std::endl;
+            return;
+        }
         std::string my_address = wallet.get_address();
 
         Blockchain chain;

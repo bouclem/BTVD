@@ -121,6 +121,13 @@ bool Transaction::is_valid_structure() const {
     return true;
 }
 
+bool Transaction::is_coinbase() const {
+    static const std::string null_hash(64, '0');
+    return inputs.size() == 1
+        && inputs[0].tx_id == null_hash
+        && inputs[0].signature == "coinbase";
+}
+
 uint64_t Transaction::total_output() const {
     uint64_t total = 0;
     for (const auto& out : outputs) {

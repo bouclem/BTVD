@@ -35,6 +35,9 @@ public:
     // Verify a signature.
     static bool verify(const std::string& data, const std::string& signature, const std::string& public_key_hex);
 
+    // Derive wallet address from a public key (hex).
+    static std::string address_from_public_key(const std::string& public_key_hex);
+
     // Create a transaction sending amount to address.
     // Uses UTXOs from the blockchain to fund the transaction.
     Transaction create_transaction(

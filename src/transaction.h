@@ -50,6 +50,9 @@ struct Transaction {
     // Validate basic structure (non-empty, positive amounts).
     bool is_valid_structure() const;
 
+    // Check if this is a coinbase transaction (miner reward).
+    bool is_coinbase() const;
+
     // Get total output amount.
     uint64_t total_output() const;
 

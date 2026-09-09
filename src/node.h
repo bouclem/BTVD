@@ -18,6 +18,13 @@
 
 namespace bitvoid {
 
+// Peer info: tracks a connected peer's socket and address.
+struct PeerInfo {
+    socket_t socket;
+    std::string address;  // "host:port"
+    bool incoming;         // true if peer connected to us, false if we connected out
+};
+
 // Node: P2P networking layer.
 // Handles peer connections, block/transaction propagation, and chain sync.
 class Node {
@@ -40,7 +47,7 @@ public:
     // Broadcast a block to all peers.
     void broadcast_block(const Block& block);
 
-    // Get list of connected peers.
+    // Get list of connected peer addresses.
     std::vector<std::string> get_peers() const;
 
     // Check if node is running.
@@ -56,10 +63,24 @@ private:
     std::thread server_thread_;
 
     mutable std::mutex peers_mutex_;
-    std::vector<std::string> peers_;
+    std::vector<PeerInfo> peers_;
 
+    // Peer management.
+    void add_peer(socket_t socket, const std::string& address, bool incoming);
+    void remove_peer(socket_t socket);
+    void send_to_peer(socket_t socket, const std::string& msg);
+    void send_to_all(const std::string& msg);
+
+    // Request chain sync from a peer.
+    void request_sync(socket_t socket);
+
+    // Exchange peer lists with a connected peer.
+    void send_peer_list(socket_t socket);
+    void connect_to_known_peers(const std::vector<std::string>& peer_addrs);
+
+    // Server and message handling.
     void server_loop();
-    void handle_peer_connection(socket_t socket);
+    void handle_peer_connection(socket_t socket, const std::string& address, bool incoming);
     void handle_message(const std::string& msg, socket_t socket);
 };
 

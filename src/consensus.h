@@ -41,7 +41,8 @@ public:
     bool should_produce_block(const Mempool& mempool, uint64_t last_block_timestamp) const;
 
     // Calculate current difficulty based on recent block times.
-    uint32_t calculate_difficulty(const std::vector<uint64_t>& recent_block_timestamps) const;
+    // current_difficulty: the difficulty of the latest block (adjusts from this, not from initial).
+    uint32_t calculate_difficulty(const std::vector<uint64_t>& recent_block_timestamps, uint32_t current_difficulty) const;
 
     // Mine a block: find a nonce that meets difficulty.
     // Records energy consumption during mining.

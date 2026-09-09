@@ -64,9 +64,9 @@ bool ConsensusEngine::should_produce_block(const Mempool& mempool, uint64_t last
     return false;
 }
 
-uint32_t ConsensusEngine::calculate_difficulty(const std::vector<uint64_t>& recent_block_timestamps) const {
+uint32_t ConsensusEngine::calculate_difficulty(const std::vector<uint64_t>& recent_block_timestamps, uint32_t current_difficulty) const {
     if (recent_block_timestamps.size() < 2) {
-        return params_.initial_difficulty;
+        return current_difficulty > 0 ? current_difficulty : params_.initial_difficulty;
     }
 
     // Calculate average block time over recent blocks.
@@ -81,11 +81,7 @@ uint32_t ConsensusEngine::calculate_difficulty(const std::vector<uint64_t>& rece
     // If blocks are too slow (ratio > 1.2), decrease difficulty.
     // Otherwise keep the same.
 
-    // This is a simplified adjustment. Real implementation would use a
-    // more precise algorithm similar to Bitcoin's, but adapted for
-    // event-driven blocks.
-
-    uint32_t current = params_.initial_difficulty;
+    uint32_t current = current_difficulty > 0 ? current_difficulty : params_.initial_difficulty;
 
     if (ratio < 0.8) {
         // Blocks too fast, increase difficulty.

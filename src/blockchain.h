@@ -74,6 +74,9 @@ private:
     // Rebuild UTXO set from scratch (for validation/loading).
     void rebuild_utxo_set();
 
+    // Verify signatures on a transaction (skipped for coinbase).
+    bool verify_transaction_signatures(const Transaction& tx) const;
+
     // UTXO key helper.
     static std::string utxo_key(const std::string& tx_id, uint32_t output_index);
 };

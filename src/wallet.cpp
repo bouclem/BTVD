@@ -203,6 +203,12 @@ bool Wallet::has_keys() const {
     return impl_->key_pair != nullptr;
 }
 
+std::string Wallet::address_from_public_key(const std::string& public_key_hex) {
+    auto pub_bytes = hex_to_bytes(public_key_hex);
+    std::string pub_str(pub_bytes.begin(), pub_bytes.end());
+    return sha256(pub_str).substr(0, 40);
+}
+
 bool Wallet::save(const std::string& path) const {
     if (!impl_->key_pair) return false;
 
