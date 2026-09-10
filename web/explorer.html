@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BitVoid Explorer - Block Explorer</title>
+    <meta name="description" content="BitVoid block explorer. View blocks, transactions, and addresses.">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav>
+        <div class="nav-logo"><a href="index.html">BitVoid</a></div>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="explorer.html">Explorer</a>
+            <a href="dex.html">DEX</a>
+            <a href="https://github.com/bouclem/BTVD/releases">GitHub</a>
+            <a href="https://reddit.com/r/BitVoid">Reddit</a>
+        </div>
+    </nav>
+
+    <section class="hero" style="min-height: 60vh;">
+        <h1>Block Explorer</h1>
+        <p class="tagline">View blocks, transactions, and addresses</p>
+    </section>
+
+    <section class="section">
+        <div id="explorer-status" class="explorer-status">
+            <div class="status-card">
+                <h3>Chain Status</h3>
+                <div id="chain-info">
+                    <p class="in-build">In Build</p>
+                    <p class="status-detail">The block explorer backend is not yet live.</p>
+                    <p class="status-detail">Once a BitVoid node is running, this page will show:</p>
+                    <ul class="status-list">
+                        <li>Latest blocks and their hashes</li>
+                        <li>Transaction details</li>
+                        <li>Address balances and UTXOs</li>
+                        <li>Energy consumption per block</li>
+                        <li>Mining difficulty and rewards</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div id="explorer-content" style="display: none;">
+            <div class="explorer-search">
+                <input type="text" id="search-input" placeholder="Search block height, tx hash, or address..." class="search-input">
+                <button id="search-btn" class="btn btn-primary">Search</button>
+            </div>
+
+            <div id="search-results" class="search-results"></div>
+
+            <h3>Recent Blocks</h3>
+            <div id="blocks-list" class="blocks-list"></div>
+        </div>
+    </section>
+
+    <footer>
+        <p>BitVoid (BTVD) - Energy when needed, not 24/7 waste.</p>
+        <p class="footer-small">Not financial advice. No premine. No dev fund. Fair launch.</p>
+    </footer>
+
+    <script src="explorer.js"></script>
+</body>
+</html>

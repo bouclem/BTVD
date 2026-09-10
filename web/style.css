@@ -324,3 +324,71 @@ footer {
         flex-direction: column;
     }
 }
+
+/* Explorer & DEX */
+.explorer-status, .status-card {
+    max-width: 700px;
+    margin: 0 auto;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2rem;
+}
+
+.status-card h3 {
+    color: var(--accent);
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+}
+
+.in-build {
+    font-size: 1.5rem;
+    color: var(--accent);
+    text-align: center;
+    margin-bottom: 1rem;
+    font-weight: bold;
+}
+
+.status-detail {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+}
+
+.status-list {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    margin: 0.5rem 0 0 1.5rem;
+    line-height: 1.8;
+}
+
+.explorer-search {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+    max-width: 700px;
+}
+
+.search-input {
+    flex: 1;
+    padding: 0.7rem 1rem;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 0.95rem;
+    font-family: inherit;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.search-results {
+    margin-bottom: 2rem;
+}
+
+.blocks-list table {
+    width: 100%;
+}

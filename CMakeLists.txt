@@ -30,6 +30,8 @@ add_library(bitvoid-core-lib STATIC
     src/consensus.cpp
     src/wallet.cpp
     src/node.cpp
+    src/httpserver.cpp
+    src/api.cpp
 )
 
 target_include_directories(bitvoid-core-lib PUBLIC src)

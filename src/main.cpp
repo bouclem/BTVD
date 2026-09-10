@@ -4,6 +4,8 @@
 #include "wallet.h"
 #include "node.h"
 #include "sha256.h"
+#include "httpserver.h"
+#include "api.h"
 #include <iostream>
 #include <string>
 #include <chrono>
@@ -26,6 +28,7 @@ void print_help() {
     std::cout << "  bitvoid-core run      [--address X] [--energy Y]    Run node + mine (full node)" << std::endl;
     std::cout << "  bitvoid-core mine     [--address X] [--energy Y]    Start mining (no P2P)" << std::endl;
     std::cout << "  bitvoid-core node     [--port P]                   Run a full node (no mining)" << std::endl;
+    std::cout << "  bitvoid-core explorer [--port P]                   Run block explorer API" << std::endl;
     std::cout << "  bitvoid-core wallet   [--new] [--balance] [--send]  Wallet operations" << std::endl;
     std::cout << "  bitvoid-core status                                Show chain status" << std::endl;
     std::cout << std::endl;
@@ -378,6 +381,47 @@ void status_mode() {
     std::cout << "  Energy (last block): " << latest.header.watt_seconds << " watt-seconds" << std::endl;
 }
 
+void explorer_mode(int argc, char* argv[]) {
+    uint16_t port = static_cast<uint16_t>(std::stoul(get_arg(argc, argv, "--port", "8545")));
+
+    Blockchain chain;
+    if (!chain.load_from_disk("bitvoid.chain")) {
+        chain.init();
+    }
+    Mempool mempool;
+
+    ExplorerApi api(chain, mempool);
+    HttpServer server(port);
+
+    server.set_handler([&api](const std::string& method, const std::string& path,
+                               const std::string& query) {
+        return api.handle(method, path, query);
+    });
+
+    server.start();
+
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
+
+    std::cout << "BitVoid Explorer API running on port " << port << std::endl;
+    std::cout << "Endpoints:" << std::endl;
+    std::cout << "  GET /api/status          - Chain status" << std::endl;
+    std::cout << "  GET /api/blocks?limit=N  - Recent blocks" << std::endl;
+    std::cout << "  GET /api/block/:height   - Block by height" << std::endl;
+    std::cout << "  GET /api/block/hash/:h   - Block by hash" << std::endl;
+    std::cout << "  GET /api/tx/:hash        - Transaction detail" << std::endl;
+    std::cout << "  GET /api/address/:addr   - Address balance + UTXOs" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Press Ctrl+C to stop." << std::endl;
+
+    while (g_running) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+
+    server.stop();
+    chain.save_to_disk("bitvoid.chain");
+}
+
 int main(int argc, char* argv[]) {
     if (argc < 2 || std::string(argv[1]) == "--help") {
         print_help();
@@ -392,6 +436,8 @@ int main(int argc, char* argv[]) {
         mine_mode(argc, argv);
     } else if (mode == "node") {
         node_mode(argc, argv);
+    } else if (mode == "explorer") {
+        explorer_mode(argc, argv);
     } else if (mode == "wallet") {
         wallet_mode(argc, argv);
     } else if (mode == "status") {
