@@ -20,7 +20,8 @@ FetchContent_MakeAvailable(nlohmann_json)
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
 
-add_executable(bitvoid-core
+# Core library (all sources except main.cpp) — shared by bitvoid-core and tests.
+add_library(bitvoid-core-lib STATIC
     src/sha256.cpp
     src/block.cpp
     src/transaction.cpp
@@ -29,12 +30,11 @@ add_executable(bitvoid-core
     src/consensus.cpp
     src/wallet.cpp
     src/node.cpp
-    src/main.cpp
 )
 
-target_include_directories(bitvoid-core PRIVATE src)
+target_include_directories(bitvoid-core-lib PUBLIC src)
 
-target_link_libraries(bitvoid-core PRIVATE
+target_link_libraries(bitvoid-core-lib PUBLIC
     OpenSSL::Crypto
     OpenSSL::SSL
     Threads::Threads
@@ -42,7 +42,44 @@ target_link_libraries(bitvoid-core PRIVATE
 )
 
 if(WIN32)
-    target_link_libraries(bitvoid-core PRIVATE ws2_32)
+    target_link_libraries(bitvoid-core-lib PUBLIC ws2_32)
 endif()
 
+# Main executable.
+add_executable(bitvoid-core src/main.cpp)
+target_link_libraries(bitvoid-core PRIVATE bitvoid-core-lib)
+
 install(TARGETS bitvoid-core RUNTIME DESTINATION bin)
+
+# --- Tests ---
+option(BUILD_TESTS "Build unit tests" ON)
+
+if(BUILD_TESTS)
+    FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG v1.14.0
+    )
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+
+    enable_testing()
+    include(GoogleTest)
+
+    add_executable(bitvoid-tests
+        tests/test_block.cpp
+        tests/test_transaction.cpp
+        tests/test_blockchain.cpp
+        tests/test_wallet.cpp
+        tests/test_consensus.cpp
+        tests/test_mempool.cpp
+    )
+
+    target_link_libraries(bitvoid-tests PRIVATE
+        bitvoid-core-lib
+        GTest::gtest
+        GTest::gtest_main
+    )
+
+    gtest_discover_tests(bitvoid-tests)
+endif()

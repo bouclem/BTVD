@@ -23,8 +23,9 @@ void print_help() {
     std::cout << "BitVoid Core v0.1.0" << std::endl;
     std::cout << std::endl;
     std::cout << "Usage:" << std::endl;
-    std::cout << "  bitvoid-core mine     [--address X] [--energy Y]    Start mining" << std::endl;
-    std::cout << "  bitvoid-core node     [--port P]                   Run a full node" << std::endl;
+    std::cout << "  bitvoid-core run      [--address X] [--energy Y]    Run node + mine (full node)" << std::endl;
+    std::cout << "  bitvoid-core mine     [--address X] [--energy Y]    Start mining (no P2P)" << std::endl;
+    std::cout << "  bitvoid-core node     [--port P]                   Run a full node (no mining)" << std::endl;
     std::cout << "  bitvoid-core wallet   [--new] [--balance] [--send]  Wallet operations" << std::endl;
     std::cout << "  bitvoid-core status                                Show chain status" << std::endl;
     std::cout << std::endl;
@@ -178,6 +179,104 @@ void node_mode(int argc, char* argv[]) {
     chain.save_to_disk("bitvoid.chain");
 }
 
+void run_mode(int argc, char* argv[]) {
+    uint16_t port = static_cast<uint16_t>(std::stoul(get_arg(argc, argv, "--port", "8333")));
+    std::string connect_str = get_arg(argc, argv, "--connect", "");
+    std::string address = get_arg(argc, argv, "--address", "");
+    std::string energy_source = get_arg(argc, argv, "--energy", "cpu");
+
+    if (address.empty()) {
+        Wallet wallet;
+        wallet.generate_keys();
+        address = wallet.get_address();
+        std::cout << "No address specified. Generated new wallet:" << std::endl;
+        std::cout << "  Address: " << address << std::endl;
+        std::cout << "  (Save this address to receive your mining rewards)" << std::endl;
+        std::cout << std::endl;
+    }
+
+    Blockchain chain;
+    if (!chain.load_from_disk("bitvoid.chain")) {
+        chain.init();
+    }
+    Mempool mempool;
+    ConsensusEngine consensus;
+    ConsensusParams params;
+
+    uint64_t genesis_timestamp = chain.get_block(0)->header.timestamp;
+
+    Node node(port, chain, mempool, consensus);
+    node.start();
+
+    if (!connect_str.empty()) {
+        size_t colon = connect_str.find(':');
+        if (colon != std::string::npos) {
+            std::string host = connect_str.substr(0, colon);
+            uint16_t peer_port = static_cast<uint16_t>(std::stoul(connect_str.substr(colon + 1)));
+            node.connect_to_peer(host, peer_port);
+        }
+    }
+
+    std::cout << "BitVoid Full Node + Miner" << std::endl;
+    std::cout << "Mining to address: " << address << std::endl;
+    std::cout << "Energy source: " << energy_source << std::endl;
+    std::cout << "P2P port: " << port << std::endl;
+    std::cout << std::endl;
+
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
+
+    uint64_t blocks_mined = 0;
+
+    while (g_running) {
+        Block latest = chain.get_latest_block();
+
+        if (!consensus.should_produce_block(mempool, latest.header.timestamp)) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            continue;
+        }
+
+        std::vector<Transaction> txs = mempool.get_for_block(100);
+
+        std::vector<uint64_t> timestamps;
+        uint64_t chain_h = chain.height();
+        uint64_t lookback = (std::min)(chain_h, static_cast<uint64_t>(1000));
+        for (uint64_t i = 0; i < lookback; i++) {
+            auto blk = chain.get_block(chain_h - lookback + i);
+            if (blk) timestamps.push_back(blk->header.timestamp);
+        }
+        if (timestamps.size() >= 2) {
+            params.difficulty = consensus.calculate_difficulty(timestamps, latest.header.difficulty);
+        }
+
+        auto block = consensus.mine_block(latest, txs, address, energy_source, params, genesis_timestamp);
+
+        if (block) {
+            if (chain.add_block(*block)) {
+                blocks_mined++;
+                std::cout << "Block added to chain! Total mined: " << blocks_mined << std::endl;
+                chain.save_to_disk("bitvoid.chain");
+
+                for (const auto& tx : block->transactions) {
+                    mempool.remove_transaction(tx.hash);
+                }
+
+                node.broadcast_block(*block);
+            } else {
+                std::cerr << "Block rejected by chain!" << std::endl;
+            }
+        }
+    }
+
+    std::cout << std::endl;
+    std::cout << "Stopping..." << std::endl;
+    node.stop();
+
+    std::cout << "Total blocks mined: " << blocks_mined << std::endl;
+    chain.save_to_disk("bitvoid.chain");
+    std::cout << "Chain saved to bitvoid.chain" << std::endl;
+}
+
 void wallet_mode(int argc, char* argv[]) {
     if (has_arg(argc, argv, "--new")) {
         std::string wallet_file = get_arg(argc, argv, "--wallet-file", "wallet.key");
@@ -287,7 +386,9 @@ int main(int argc, char* argv[]) {
 
     std::string mode = argv[1];
 
-    if (mode == "mine") {
+    if (mode == "run") {
+        run_mode(argc, argv);
+    } else if (mode == "mine") {
         mine_mode(argc, argv);
     } else if (mode == "node") {
         node_mode(argc, argv);
